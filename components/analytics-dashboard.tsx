@@ -19,7 +19,27 @@ import {
 } from "recharts"
 import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Lightbulb, Brain, Target, Zap } from "lucide-react"
 
-const COLORS = ["#7c3aed", "#06b6d4", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#8b5cf6", "#6366f1"]
+const VIBRANT_PIE_COLORS = [
+  "#FF6B6B", // Vibrant Red
+  "#4ECDC4", // Vibrant Teal
+  "#45B7D1", // Vibrant Blue
+  "#FFA502", // Vibrant Orange
+  "#9B59B6", // Vibrant Purple
+  "#E74C3C", // Bright Red
+  "#3498DB", // Bright Blue
+  "#2ECC71", // Bright Green
+  "#F39C12", // Golden Orange
+  "#E91E63", // Pink
+]
+
+const DISTINCT_BAR_COLORS = [
+  "#6366F1", // Indigo
+  "#06B6D4", // Cyan
+  "#10B981", // Emerald
+  "#F59E0B", // Amber
+  "#EF4444", // Red
+  "#8B5CF6", // Violet
+]
 
 const CATEGORY_ICONS: Record<string, string> = {
   Food: "🍔",
@@ -117,6 +137,8 @@ export function AnalyticsDashboard() {
 
   // Generate AI Insights
   const aiInsights = generateAIInsights(expenses, income, goals, categoryData, thisMonthTotal, lastMonthTotal)
+
+  const monthlyInsights = generateMonthlyInsights(monthlyData, categoryData, income)
 
   return (
     <div className="space-y-6">
@@ -258,6 +280,7 @@ export function AnalyticsDashboard() {
             <Card className="bg-card">
               <CardHeader>
                 <CardTitle>Spending by Category</CardTitle>
+                <CardDescription>Visual breakdown with vibrant colors for easy distinction</CardDescription>
               </CardHeader>
               <CardContent>
                 {categoryData.length > 0 ? (
@@ -274,7 +297,7 @@ export function AnalyticsDashboard() {
                           dataKey="value"
                         >
                           {categoryData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            <Cell key={`cell-${index}`} fill={VIBRANT_PIE_COLORS[index % VIBRANT_PIE_COLORS.length]} />
                           ))}
                         </Pie>
                         <Tooltip formatter={(value: number) => [`₹${value.toLocaleString()}`, "Amount"]} />
@@ -315,8 +338,7 @@ export function AnalyticsDashboard() {
                             <div
                               className="h-full rounded-full transition-all"
                               style={{
-                                width: `${percentage}%`,
-                                backgroundColor: COLORS[index % COLORS.length],
+                                backgroundColor: VIBRANT_PIE_COLORS[index % VIBRANT_PIE_COLORS.length],
                               }}
                             />
                           </div>
@@ -333,38 +355,77 @@ export function AnalyticsDashboard() {
         </TabsContent>
 
         <TabsContent value="monthly">
-          <Card className="bg-card">
-            <CardHeader>
-              <CardTitle>Monthly Spending Trends</CardTitle>
-              <CardDescription>Your spending over the last 6 months</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {last6Months.length > 0 ? (
-                <div className="h-[350px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={last6Months}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                      <XAxis dataKey="month" className="text-muted-foreground" />
-                      <YAxis className="text-muted-foreground" />
-                      <Tooltip
-                        formatter={(value: number) => [`₹${value.toLocaleString()}`, "Spent"]}
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px",
-                        }}
-                      />
-                      <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <div className="h-[350px] flex items-center justify-center text-muted-foreground">
-                  No monthly data to display
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <div className="grid lg:grid-cols-3 gap-6">
+            {/* Bar Chart */}
+            <div className="lg:col-span-2">
+              <Card className="bg-card">
+                <CardHeader>
+                  <CardTitle>Monthly Spending Trends</CardTitle>
+                  <CardDescription>Your spending over the last 6 months with distinct colors</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {last6Months.length > 0 ? (
+                    <div className="h-[350px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={last6Months}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                          <XAxis dataKey="month" className="text-muted-foreground" />
+                          <YAxis className="text-muted-foreground" />
+                          <Tooltip
+                            formatter={(value: number) => [`₹${value.toLocaleString()}`, "Spent"]}
+                            contentStyle={{
+                              backgroundColor: "hsl(var(--card))",
+                              border: "1px solid hsl(var(--border))",
+                              borderRadius: "8px",
+                            }}
+                          />
+                          <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
+                            {last6Months.map((entry, index) => (
+                              <Cell
+                                key={`bar-${index}`}
+                                fill={DISTINCT_BAR_COLORS[index % DISTINCT_BAR_COLORS.length]}
+                              />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="h-[350px] flex items-center justify-center text-muted-foreground">
+                      No monthly data to display
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card className="bg-primary/5 border-primary/20 lg:col-span-1">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Brain className="w-4 h-4 text-primary" />
+                  Monthly Insights
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {monthlyInsights.length > 0 ? (
+                  <div className="space-y-3">
+                    {monthlyInsights.map((insight, index) => (
+                      <div key={index} className="text-sm p-3 bg-background/50 rounded-lg border border-border/50">
+                        <h4 className="font-semibold text-foreground mb-1 text-xs">{insight.title}</h4>
+                        <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                          {insight.description}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-xs text-muted-foreground">Add more monthly data to see detailed insights</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="weekly">
@@ -412,6 +473,7 @@ export function AnalyticsDashboard() {
   )
 }
 
+// AIInsight interface
 interface AIInsight {
   type: "warning" | "success" | "tip" | "info"
   title: string
@@ -419,6 +481,7 @@ interface AIInsight {
   recommendation?: string
 }
 
+// Function to generate AI Insights
 function generateAIInsights(
   expenses: any[],
   income: number,
@@ -556,6 +619,66 @@ function generateAIInsights(
       description: `Based on your ${expenses.length} transactions, your average transaction size is ₹${Math.round(avgTransaction).toLocaleString()}. Understanding your typical transaction size can help identify unusual expenses.\n\nPattern details:\n- Total transactions: ${expenses.length}\n- Average transaction: ₹${Math.round(avgTransaction).toLocaleString()}\n- Largest expense: ₹${Math.max(...expenses.map((e) => e.amount)).toLocaleString()}\n- Smallest expense: ₹${Math.min(...expenses.map((e) => e.amount)).toLocaleString()}`,
       recommendation:
         "Set a mental 'pause threshold' at 2x your average (₹${Math.round(avgTransaction * 2).toLocaleString()}). For any purchase above this, take 24 hours to decide if it's truly necessary.",
+    })
+  }
+
+  return insights
+}
+
+// Function to generate detailed monthly insights
+function generateMonthlyInsights(
+  monthlyData: { key: string; month: string; amount: number }[],
+  categoryData: { name: string; value: number }[],
+  income: number,
+): { title: string; description: string }[] {
+  const insights: { title: string; description: string }[] = []
+
+  if (monthlyData.length === 0) return insights
+
+  // Insight 1: Overall monthly trend
+  if (monthlyData.length >= 2) {
+    const currentMonth = monthlyData[monthlyData.length - 1]
+    const previousMonth = monthlyData[monthlyData.length - 2]
+    const percentageChange = ((currentMonth.amount - previousMonth.amount) / previousMonth.amount) * 100
+
+    insights.push({
+      title: "Monthly Trend",
+      description: `${currentMonth.month}: ₹${currentMonth.amount.toLocaleString()}\nChange from ${previousMonth.month}: ${percentageChange > 0 ? "+" : ""}${percentageChange.toFixed(1)}%\n\nYour spending is ${percentageChange > 0 ? "increasing" : "decreasing"} month over month. Average monthly spend: ₹${Math.round(monthlyData.reduce((sum, m) => sum + m.amount, 0) / monthlyData.length).toLocaleString()}`,
+    })
+  }
+
+  // Insight 2: Highest and lowest spending months
+  const sortedByAmount = [...monthlyData].sort((a, b) => b.amount - a.amount)
+  if (sortedByAmount.length > 0) {
+    const highest = sortedByAmount[0]
+    const lowest = sortedByAmount[sortedByAmount.length - 1]
+
+    insights.push({
+      title: "Peak Analysis",
+      description: `Highest: ${highest.month} (₹${highest.amount.toLocaleString()})\nLowest: ${lowest.month} (₹${lowest.amount.toLocaleString()})\nDifference: ₹${(highest.amount - lowest.amount).toLocaleString()}\n\nThis ${((highest.amount / lowest.amount - 1) * 100).toFixed(1)}% variation shows seasonal or lifestyle patterns.`,
+    })
+  }
+
+  // Insight 3: Average monthly spending
+  if (monthlyData.length > 0) {
+    const avgMonthly = monthlyData.reduce((sum, m) => sum + m.amount, 0) / monthlyData.length
+    const currentMonth = monthlyData[monthlyData.length - 1]
+
+    insights.push({
+      title: "Monthly Average",
+      description: `Average spend: ₹${Math.round(avgMonthly).toLocaleString()}\nCurrent month: ₹${currentMonth.amount.toLocaleString()}\nDifference: ${currentMonth.amount > avgMonthly ? "+" : ""}₹${Math.round(currentMonth.amount - avgMonthly).toLocaleString()}\n\nYou're ${currentMonth.amount > avgMonthly ? "above" : "below"} your average by ${((Math.abs(currentMonth.amount - avgMonthly) / avgMonthly) * 100).toFixed(1)}%`,
+    })
+  }
+
+  // Insight 4: Category contribution to monthly expenses
+  if (categoryData.length > 0 && monthlyData.length > 0) {
+    const topCategory = categoryData[0]
+    const currentMonthAmount = monthlyData[monthlyData.length - 1].amount
+    const topCategoryPercentage = (topCategory.value / currentMonthAmount) * 100
+
+    insights.push({
+      title: "Top Category Impact",
+      description: `${topCategory.name} accounts for ${topCategoryPercentage.toFixed(1)}% of current month expenses.\nAmount: ₹${topCategory.value.toLocaleString()}\n\nFocusing on this category alone could have the biggest impact on your budget.`,
     })
   }
 
