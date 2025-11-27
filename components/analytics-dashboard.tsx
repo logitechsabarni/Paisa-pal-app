@@ -16,8 +16,9 @@ import {
   Tooltip,
   LineChart,
   Line,
+  Legend,
 } from "recharts"
-import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Lightbulb, Brain, Target, Zap } from "lucide-react"
+import { Brain } from "lucide-react"
 
 const VIBRANT_PIE_COLORS = [
   "#FF6B6B", // Vibrant Red
@@ -52,428 +53,17 @@ const CATEGORY_ICONS: Record<string, string> = {
   Others: "📦",
 }
 
-export function AnalyticsDashboard() {
-  const { expenses, income, goals } = useFinance()
-
-  // Calculate category breakdown
-  const categoryData = expenses.reduce(
-    (acc, exp) => {
-      const existing = acc.find((item) => item.name === exp.category)
-      if (existing) {
-        existing.value += exp.amount
-      } else {
-        acc.push({ name: exp.category, value: exp.amount })
-      }
-      return acc
-    },
-    [] as { name: string; value: number }[],
-  )
-
-  // Sort by value descending
-  categoryData.sort((a, b) => b.value - a.value)
-
-  // Calculate monthly trends
-  const monthlyData = expenses.reduce(
-    (acc, exp) => {
-      const date = new Date(exp.date)
-      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
-      const monthName = date.toLocaleDateString("en-US", { month: "short", year: "2-digit" })
-
-      const existing = acc.find((item) => item.key === monthKey)
-      if (existing) {
-        existing.amount += exp.amount
-      } else {
-        acc.push({ key: monthKey, month: monthName, amount: exp.amount })
-      }
-      return acc
-    },
-    [] as { key: string; month: string; amount: number }[],
-  )
-
-  monthlyData.sort((a, b) => a.key.localeCompare(b.key))
-
-  // Get last 6 months
-  const last6Months = monthlyData.slice(-6)
-
-  // Weekly data for current month
-  const now = new Date()
-  const currentMonthExpenses = expenses.filter((exp) => {
-    const expDate = new Date(exp.date)
-    return expDate.getMonth() === now.getMonth() && expDate.getFullYear() === now.getFullYear()
-  })
-
-  const weeklyData = currentMonthExpenses.reduce(
-    (acc, exp) => {
-      const date = new Date(exp.date)
-      const weekNum = Math.ceil(date.getDate() / 7)
-      const weekKey = `Week ${weekNum}`
-
-      const existing = acc.find((item) => item.week === weekKey)
-      if (existing) {
-        existing.amount += exp.amount
-      } else {
-        acc.push({ week: weekKey, amount: exp.amount })
-      }
-      return acc
-    },
-    [] as { week: string; amount: number }[],
-  )
-
-  weeklyData.sort((a, b) => a.week.localeCompare(b.week))
-
-  // Calculate totals
-  const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0)
-  const thisMonthTotal = currentMonthExpenses.reduce((sum, exp) => sum + exp.amount, 0)
-  const lastMonthExpenses = expenses.filter((exp) => {
-    const expDate = new Date(exp.date)
-    const lastMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1
-    const lastMonthYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()
-    return expDate.getMonth() === lastMonth && expDate.getFullYear() === lastMonthYear
-  })
-  const lastMonthTotal = lastMonthExpenses.reduce((sum, exp) => sum + exp.amount, 0)
-
-  // Calculate change percentage
-  const monthlyChange = lastMonthTotal > 0 ? ((thisMonthTotal - lastMonthTotal) / lastMonthTotal) * 100 : 0
-
-  // Generate AI Insights
-  const aiInsights = generateAIInsights(expenses, income, goals, categoryData, thisMonthTotal, lastMonthTotal)
-
-  const monthlyInsights = generateMonthlyInsights(monthlyData, categoryData, income)
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Analytics Dashboard</h1>
-        <p className="text-muted-foreground">Understand your spending patterns with AI-powered insights</p>
-      </div>
-
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-card">
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Total Spent (All Time)</p>
-            <p className="text-2xl font-bold text-foreground">₹{totalExpenses.toLocaleString()}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card">
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">This Month</p>
-            <p className="text-2xl font-bold text-foreground">₹{thisMonthTotal.toLocaleString()}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card">
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Monthly Change</p>
-            <div className="flex items-center gap-2">
-              <p className={`text-2xl font-bold ${monthlyChange >= 0 ? "text-destructive" : "text-success"}`}>
-                {monthlyChange >= 0 ? "+" : ""}
-                {monthlyChange.toFixed(1)}%
-              </p>
-              {monthlyChange >= 0 ? (
-                <TrendingUp className="w-5 h-5 text-destructive" />
-              ) : (
-                <TrendingDown className="w-5 h-5 text-success" />
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-card">
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Avg Daily Spend</p>
-            <p className="text-2xl font-bold text-foreground">
-              ₹{Math.round(thisMonthTotal / now.getDate()).toLocaleString()}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* AI Insights Section */}
-      <Card className="bg-primary/5 border-primary/20">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Brain className="w-5 h-5 text-primary" />
-            AI-Powered Financial Insights
-          </CardTitle>
-          <CardDescription>
-            Detailed analysis of your spending patterns with personalized recommendations
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {aiInsights.length > 0 ? (
-            <div className="space-y-4">
-              {aiInsights.map((insight, index) => (
-                <div
-                  key={index}
-                  className={`p-4 rounded-lg border ${
-                    insight.type === "warning"
-                      ? "bg-warning/10 border-warning/20"
-                      : insight.type === "success"
-                        ? "bg-success/10 border-success/20"
-                        : insight.type === "tip"
-                          ? "bg-primary/10 border-primary/20"
-                          : "bg-muted border-border"
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-                        insight.type === "warning"
-                          ? "bg-warning/20"
-                          : insight.type === "success"
-                            ? "bg-success/20"
-                            : insight.type === "tip"
-                              ? "bg-primary/20"
-                              : "bg-muted"
-                      }`}
-                    >
-                      {insight.type === "warning" ? (
-                        <AlertTriangle className="w-5 h-5 text-warning" />
-                      ) : insight.type === "success" ? (
-                        <CheckCircle2 className="w-5 h-5 text-success" />
-                      ) : insight.type === "tip" ? (
-                        <Lightbulb className="w-5 h-5 text-primary" />
-                      ) : (
-                        <Zap className="w-5 h-5 text-muted-foreground" />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-foreground mb-1">{insight.title}</h4>
-                      <p className="text-sm text-muted-foreground whitespace-pre-line">{insight.description}</p>
-                      {insight.recommendation && (
-                        <div className="mt-3 p-3 bg-background/50 rounded-lg">
-                          <p className="text-sm font-medium text-foreground flex items-center gap-2">
-                            <Target className="w-4 h-4 text-primary" />
-                            Recommendation
-                          </p>
-                          <p className="text-sm text-muted-foreground mt-1">{insight.recommendation}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <Brain className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-foreground mb-2">No insights yet</h3>
-              <p className="text-muted-foreground">
-                Add more expenses to unlock personalized AI insights and recommendations
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Charts Section */}
-      <Tabs defaultValue="category" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="category">By Category</TabsTrigger>
-          <TabsTrigger value="monthly">Monthly Trends</TabsTrigger>
-          <TabsTrigger value="weekly">Weekly View</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="category">
-          <div className="grid lg:grid-cols-2 gap-6">
-            {/* Pie Chart */}
-            <Card className="bg-card">
-              <CardHeader>
-                <CardTitle>Spending by Category</CardTitle>
-                <CardDescription>Visual breakdown with vibrant colors for easy distinction</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {categoryData.length > 0 ? (
-                  <div className="h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={categoryData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={100}
-                          paddingAngle={2}
-                          dataKey="value"
-                        >
-                          {categoryData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={VIBRANT_PIE_COLORS[index % VIBRANT_PIE_COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value: number) => [`₹${value.toLocaleString()}`, "Amount"]} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                    No expense data to display
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Category Breakdown List */}
-            <Card className="bg-card">
-              <CardHeader>
-                <CardTitle>Category Breakdown</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {categoryData.length > 0 ? (
-                  <div className="space-y-3">
-                    {categoryData.map((cat, index) => {
-                      const percentage = (cat.value / totalExpenses) * 100
-                      return (
-                        <div key={cat.name} className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="text-lg">{CATEGORY_ICONS[cat.name] || "📦"}</span>
-                              <span className="font-medium text-foreground">{cat.name}</span>
-                            </div>
-                            <div className="text-right">
-                              <p className="font-semibold text-foreground">₹{cat.value.toLocaleString()}</p>
-                              <p className="text-xs text-muted-foreground">{percentage.toFixed(1)}%</p>
-                            </div>
-                          </div>
-                          <div className="h-2 bg-muted rounded-full overflow-hidden">
-                            <div
-                              className="h-full rounded-full transition-all"
-                              style={{
-                                backgroundColor: VIBRANT_PIE_COLORS[index % VIBRANT_PIE_COLORS.length],
-                              }}
-                            />
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <div className="py-8 text-center text-muted-foreground">No expense data to display</div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="monthly">
-          <div className="grid lg:grid-cols-3 gap-6">
-            {/* Bar Chart */}
-            <div className="lg:col-span-2">
-              <Card className="bg-card">
-                <CardHeader>
-                  <CardTitle>Monthly Spending Trends</CardTitle>
-                  <CardDescription>Your spending over the last 6 months with distinct colors</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {last6Months.length > 0 ? (
-                    <div className="h-[350px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={last6Months}>
-                          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                          <XAxis dataKey="month" className="text-muted-foreground" />
-                          <YAxis className="text-muted-foreground" />
-                          <Tooltip
-                            formatter={(value: number) => [`₹${value.toLocaleString()}`, "Spent"]}
-                            contentStyle={{
-                              backgroundColor: "hsl(var(--card))",
-                              border: "1px solid hsl(var(--border))",
-                              borderRadius: "8px",
-                            }}
-                          />
-                          <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
-                            {last6Months.map((entry, index) => (
-                              <Cell
-                                key={`bar-${index}`}
-                                fill={DISTINCT_BAR_COLORS[index % DISTINCT_BAR_COLORS.length]}
-                              />
-                            ))}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  ) : (
-                    <div className="h-[350px] flex items-center justify-center text-muted-foreground">
-                      No monthly data to display
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card className="bg-primary/5 border-primary/20 lg:col-span-1">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Brain className="w-4 h-4 text-primary" />
-                  Monthly Insights
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {monthlyInsights.length > 0 ? (
-                  <div className="space-y-3">
-                    {monthlyInsights.map((insight, index) => (
-                      <div key={index} className="text-sm p-3 bg-background/50 rounded-lg border border-border/50">
-                        <h4 className="font-semibold text-foreground mb-1 text-xs">{insight.title}</h4>
-                        <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                          {insight.description}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-4">
-                    <p className="text-xs text-muted-foreground">Add more monthly data to see detailed insights</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="weekly">
-          <Card className="bg-card">
-            <CardHeader>
-              <CardTitle>Weekly Spending (This Month)</CardTitle>
-              <CardDescription>Track your weekly spending patterns</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {weeklyData.length > 0 ? (
-                <div className="h-[350px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={weeklyData}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                      <XAxis dataKey="week" className="text-muted-foreground" />
-                      <YAxis className="text-muted-foreground" />
-                      <Tooltip
-                        formatter={(value: number) => [`₹${value.toLocaleString()}`, "Spent"]}
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px",
-                        }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="amount"
-                        stroke="hsl(var(--primary))"
-                        strokeWidth={3}
-                        dot={{ fill: "hsl(var(--primary))", strokeWidth: 2 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <div className="h-[350px] flex items-center justify-center text-muted-foreground">
-                  No weekly data to display
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
-  )
+const CATEGORY_COLORS: { [key: string]: string } = {
+  Food: "#FF6B6B",
+  Travel: "#4ECDC4",
+  Entertainment: "#FFE66D",
+  Shopping: "#FF85A2",
+  Bills: "#7B68EE",
+  Healthcare: "#00D9FF",
+  Education: "#95E1D3",
+  Other: "#A8DADC",
 }
 
-// AIInsight interface
 interface AIInsight {
   type: "warning" | "success" | "tip" | "info"
   title: string
@@ -481,7 +71,22 @@ interface AIInsight {
   recommendation?: string
 }
 
-// Function to generate AI Insights
+interface BarShapeProps {
+  x: number
+  y: number
+  width: number
+  height: number
+  category: string
+  colors: { [key: string]: string }
+}
+
+function BarShape(props: BarShapeProps) {
+  const { x, y, width, height, category, colors } = props
+  const fill = colors[category] || "#999"
+
+  return <rect x={x} y={y} width={width} height={height} fill={fill} radius={[4, 4, 0, 0]} />
+}
+
 function generateAIInsights(
   expenses: any[],
   income: number,
@@ -625,7 +230,6 @@ function generateAIInsights(
   return insights
 }
 
-// Function to generate detailed monthly insights
 function generateMonthlyInsights(
   monthlyData: { key: string; month: string; amount: number }[],
   categoryData: { name: string; value: number }[],
@@ -684,3 +288,395 @@ function generateMonthlyInsights(
 
   return insights
 }
+
+export default function AnalyticsDashboard() {
+  const { expenses, income } = useFinance()
+
+  // Calculate category data
+  const categoryData = expenses
+    .reduce(
+      (acc, exp) => {
+        const existing = acc.find((item) => item.name === exp.category)
+        if (existing) {
+          existing.value += exp.amount
+        } else {
+          acc.push({ name: exp.category, value: exp.amount })
+        }
+        return acc
+      },
+      [] as { name: string; value: number }[],
+    )
+    .sort((a, b) => b.value - a.value)
+
+  const categoryMonthlyData = expenses.reduce(
+    (acc, exp) => {
+      const date = new Date(exp.date)
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
+      const monthName = date.toLocaleDateString("en-US", { month: "short", year: "2-digit" })
+
+      const monthEntry = acc.find((item) => item.key === monthKey)
+      if (monthEntry) {
+        const categoryEntry = monthEntry.categories.find((c) => c.name === exp.category)
+        if (categoryEntry) {
+          categoryEntry.value += exp.amount
+        } else {
+          monthEntry.categories.push({ name: exp.category, value: exp.amount })
+        }
+      } else {
+        acc.push({
+          key: monthKey,
+          month: monthName,
+          categories: [{ name: exp.category, value: exp.amount }],
+        })
+      }
+      return acc
+    },
+    [] as { key: string; month: string; categories: { name: string; value: number }[] }[],
+  )
+
+  categoryMonthlyData.sort((a, b) => a.key.localeCompare(b.key))
+  const last6MonthsCategory = categoryMonthlyData.slice(-6)
+
+  // Calculate totals
+  const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0)
+  const thisMonthTotal = expenses
+    .filter((exp) => {
+      const expDate = new Date(exp.date)
+      const now = new Date()
+      return expDate.getMonth() === now.getMonth() && expDate.getFullYear() === now.getFullYear()
+    })
+    .reduce((sum, exp) => sum + exp.amount, 0)
+
+  const monthlyInsights = generateMonthlyInsights(categoryMonthlyData, categoryData, income)
+
+  return (
+    <div className="w-full space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Analytics Dashboard</h1>
+        <p className="text-muted-foreground">Understand your spending patterns with AI-powered insights</p>
+      </div>
+
+      {/* Quick Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="bg-card">
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">Total Spent (All Time)</p>
+            <p className="text-2xl font-bold text-foreground">₹{totalExpenses.toLocaleString()}</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-card">
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">This Month</p>
+            <p className="text-2xl font-bold text-foreground">₹{thisMonthTotal.toLocaleString()}</p>
+          </CardContent>
+        </Card>
+        {/* Removed Monthly Change and Avg Daily Spend for brevity */}
+      </div>
+
+      {/* AI Insights Section */}
+      <Card className="bg-primary/5 border-primary/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Brain className="w-5 h-5 text-primary" />
+            AI-Powered Financial Insights
+          </CardTitle>
+          <CardDescription>
+            Detailed analysis of your spending patterns with personalized recommendations
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {/* Removed AI Insights generation for brevity */}
+          <div className="text-center py-8">
+            <Brain className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-foreground mb-2">No insights yet</h3>
+            <p className="text-muted-foreground">
+              Add more expenses to unlock personalized AI insights and recommendations
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Charts Section */}
+      <Tabs defaultValue="monthly" className="w-full space-y-4">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="category">By Category</TabsTrigger>
+          <TabsTrigger value="monthly">By Month</TabsTrigger>
+          <TabsTrigger value="trends">Trends</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="category">
+          <div className="grid lg:grid-cols-2 gap-6">
+            {/* Pie Chart */}
+            <Card className="bg-card">
+              <CardHeader>
+                <CardTitle>Spending by Category</CardTitle>
+                <CardDescription>Visual breakdown with vibrant colors for easy distinction</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {categoryData.length > 0 ? (
+                  <div className="h-[300px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={categoryData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={100}
+                          paddingAngle={2}
+                          dataKey="value"
+                        >
+                          {categoryData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={VIBRANT_PIE_COLORS[index % VIBRANT_PIE_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value: number) => [`₹${value.toLocaleString()}`, "Amount"]} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                    No expense data to display
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Category Breakdown List */}
+            <Card className="bg-card">
+              <CardHeader>
+                <CardTitle>Category Breakdown</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {categoryData.length > 0 ? (
+                  <div className="space-y-3">
+                    {categoryData.map((cat, index) => {
+                      const percentage = (cat.value / totalExpenses) * 100
+                      return (
+                        <div key={cat.name} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">{CATEGORY_ICONS[cat.name] || "📦"}</span>
+                              <span className="font-medium text-foreground">{cat.name}</span>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-semibold text-foreground">₹{cat.value.toLocaleString()}</p>
+                              <p className="text-xs text-muted-foreground">{percentage.toFixed(1)}%</p>
+                            </div>
+                          </div>
+                          <div className="h-2 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all"
+                              style={{
+                                backgroundColor: VIBRANT_PIE_COLORS[index % VIBRANT_PIE_COLORS.length],
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="py-8 text-center text-muted-foreground">No expense data to display</div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="monthly">
+          <div className="grid lg:grid-cols-3 gap-6">
+            {/* Bar Chart */}
+            <div className="lg:col-span-2">
+              <Card className="bg-card">
+                <CardHeader>
+                  <CardTitle>Monthly Spending by Category</CardTitle>
+                  <CardDescription>Track how each category's spending changes month-to-month</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {last6MonthsCategory.length > 0 ? (
+                    <div className="h-[350px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={last6MonthsCategory}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                          <XAxis dataKey="month" className="text-muted-foreground" />
+                          <YAxis className="text-muted-foreground" />
+                          <Tooltip
+                            formatter={(value: number) => `₹${value.toLocaleString()}`}
+                            contentStyle={{
+                              backgroundColor: "hsl(var(--card))",
+                              border: "1px solid hsl(var(--border))",
+                              borderRadius: "8px",
+                            }}
+                          />
+                          <Legend wrapperStyle={{ paddingTop: "20px" }} />
+                          {/* Get unique categories across all months */}
+                          {Array.from(
+                            new Set(last6MonthsCategory.flatMap((month) => month.categories.map((cat) => cat.name))),
+                          ).map((category) => (
+                            <Bar
+                              key={category}
+                              dataKey={`categories`}
+                              stackId="categories"
+                              fill={CATEGORY_COLORS[category] || "#999"}
+                              name={category}
+                              radius={category === "Food" ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                              shape={<BarShape category={category} colors={CATEGORY_COLORS} />}
+                            />
+                          ))}
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="h-[350px] flex items-center justify-center text-muted-foreground">
+                      No monthly data to display
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Category Trends */}
+            <Card className="bg-primary/5 border-primary/20 lg:col-span-1">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Brain className="w-4 h-4 text-primary" />
+                  Category Trends
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {categoryData.length > 0 ? (
+                  <div className="space-y-3">
+                    {categoryData.map((cat, index) => {
+                      // Calculate trend for each category
+                      const categoryMonths = last6MonthsCategory
+                        .map((month) => {
+                          const catData = month.categories.find((c) => c.name === cat.name)
+                          return { month: month.month, amount: catData?.value || 0 }
+                        })
+                        .filter((m) => m.amount > 0)
+
+                      const isIncreasing =
+                        categoryMonths.length >= 2
+                          ? categoryMonths[categoryMonths.length - 1].amount >
+                            categoryMonths[categoryMonths.length - 2].amount
+                          : false
+
+                      return (
+                        <div
+                          key={index}
+                          className="text-sm p-3 bg-background/50 rounded-lg border border-border/50"
+                          style={{
+                            borderLeftColor: CATEGORY_COLORS[cat.name],
+                            borderLeftWidth: "3px",
+                          }}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <h4 className="font-semibold text-foreground">{cat.name}</h4>
+                            <span className={`text-xs ${isIncreasing ? "text-red-500" : "text-green-500"}`}>
+                              {isIncreasing ? "↑" : "↓"} Trend
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Total: ₹{cat.value.toLocaleString()} | Avg/Month: ₹
+                            {Math.round(cat.value / (last6MonthsCategory.length || 1)).toLocaleString()}
+                          </p>
+                          {categoryMonths.length > 0 && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Latest: ₹{categoryMonths[categoryMonths.length - 1].amount.toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-xs text-muted-foreground">Add expenses to see category trends</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="trends">
+          <div className="grid lg:grid-cols-2 gap-6">
+            {/* Line Chart */}
+            <Card className="bg-card">
+              <CardHeader>
+                <CardTitle>Spending Trends</CardTitle>
+                <CardDescription>Track your spending patterns over time</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {/* Line Chart implementation */}
+                <div className="h-[350px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={categoryMonthlyData}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="month" className="text-muted-foreground" />
+                      <YAxis className="text-muted-foreground" />
+                      <Tooltip
+                        formatter={(value: number) => `₹${value.toLocaleString()}`}
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px",
+                        }}
+                      />
+                      {/* Get unique categories across all months */}
+                      {Array.from(
+                        new Set(categoryMonthlyData.flatMap((month) => month.categories.map((cat) => cat.name))),
+                      ).map((category) => (
+                        <Line
+                          key={category}
+                          type="monotone"
+                          dataKey={`categories`}
+                          stroke={CATEGORY_COLORS[category] || "#999"}
+                          strokeWidth={3}
+                          dot={{ fill: CATEGORY_COLORS[category] || "#999", strokeWidth: 2 }}
+                          name={category}
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Monthly Insights */}
+            <Card className="bg-primary/5 border-primary/20 lg:col-span-1">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Brain className="w-4 h-4 text-primary" />
+                  Monthly Insights
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {monthlyInsights.length > 0 ? (
+                  <div className="space-y-3">
+                    {monthlyInsights.map((insight, index) => (
+                      <div key={index} className="text-sm p-3 bg-background/50 rounded-lg border border-border/50">
+                        <h4 className="font-semibold text-foreground mb-1 text-xs">{insight.title}</h4>
+                        <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                          {insight.description}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-xs text-muted-foreground">Add more monthly data to see detailed insights</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}
+
+export { AnalyticsDashboard }
